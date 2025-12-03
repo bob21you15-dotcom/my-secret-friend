@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Settings, Smile, User, Palette, Plus, Trash2, Volume2, VolumeX, Music, Lightbulb, MessageCircle } from 'lucide-react';
+import { Send, Settings, Smile, User, Palette, Plus, Trash2, Volume2, VolumeX, Music, Lightbulb, MessageCircle, ArrowRight, Check, ChevronLeft } from 'lucide-react';
 
 /* --- 1. 오디오 엔진 (효과음용) --- */
 let audioCtx = null;
@@ -292,13 +292,10 @@ const AlienSVG = ({ features, emotion, size = "large" }) => {
 const App = () => {
   const [step, setStep] = useState(1);
   
-  // [수정] API 키 초기화 로직: 환경 변수 > localStorage 순으로 불러옵니다.
+  // API 키 초기화 로직: 환경 변수 > localStorage 순으로 불러옵니다.
   const [apiKey, setApiKey] = useState(() => {
     if (typeof window !== 'undefined') {
-      const isDevEnv = typeof process !== 'undefined' && process.env.NODE_ENV !== 'production';
-      // Vercel 환경 변수가 설정되었다면 바로 사용합니다.
-      const vercelEnvKey = isDevEnv ? (typeof process.env.VITE_GEMINI_API_KEY !== 'undefined' ? process.env.VITE_GEMINI_API_KEY : '') : '';
-      
+      const vercelEnvKey = (typeof process !== 'undefined' && process.env.VITE_GEMINI_API_KEY) || (typeof window.VITE_GEMINI_API_KEY !== 'undefined' ? window.VITE_GEMINI_API_KEY : undefined);
       if (vercelEnvKey) return vercelEnvKey;
       
       return localStorage.getItem("gemini_api_key") || "";
@@ -345,17 +342,12 @@ const App = () => {
   
   // API 키 저장 로직: Vercel 환경 변수가 로드되지 않은 경우에만 localStorage에 저장
   useEffect(() => { 
-    // Vercel 환경 체크 (process.env.VERCEL_ENV 대신 API 키 유무로 체크)
-    if (apiKey && !isVercelEnvCheck()) {
+    const isVercelEnvLoaded = (typeof process !== 'undefined' && process.env.VITE_GEMINI_API_KEY) || (typeof window.VITE_GEMINI_API_KEY !== 'undefined' && window.VITE_GEMINI_API_KEY);
+    if (apiKey && !isVercelEnvLoaded) {
       localStorage.setItem("gemini_api_key", apiKey);
     }
   }, [apiKey]);
   
-  const isVercelEnvCheck = () => {
-    // Vercel 환경 변수가 설정되어 있으면 true 반환 (Vite가 환경 변수를 주입하는 방식에 의존)
-    return (typeof process !== 'undefined' && process.env.VITE_GEMINI_API_KEY);
-  }
-
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
   useEffect(() => { setCurrentEmotion('normal'); }, [activeCharId]);
 
@@ -473,9 +465,23 @@ const App = () => {
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-0 font-sans text-slate-100">
       <div className="w-full h-screen md:max-w-7xl md:h-[95vh] bg-slate-800 shadow-2xl rounded-none md:rounded-[2.5rem] overflow-hidden flex flex-col md:flex-row border-0 md:border-4 border-slate-700 ring-1 ring-slate-600">
         
-        {/* [왼쪽] 설정 패널 */}
-        <div className={`w-full md:w-1/3 bg-slate-900 border-r border-slate-700 flex flex-col ${step === 1 ? 'flex' : 'hidden md:flex'}`}>
+        {/* [왼쪽] 설정 패널 - 모바일 Step 1, 2 화면 */}
+        <div className={`w-full md:w-1/3 bg-slate-900 border-r border-slate-700 flex flex-col ${step !== 3 ? 'flex' : 'hidden md:flex'}`}>
+          
+          {/* 모바일 상단 네비게이션 (Step 전환) */}
+          <div className="md:hidden p-4 bg-slate-800 border-b border-slate-700 flex items-center justify-between sticky top-0 z-10">
+              <button onClick={() => setStep(step > 1 ? step - 1 : 1)} disabled={step === 1} className={`p-1 rounded-full ${step > 1 ? 'text-indigo-400 hover:bg-slate-700' : 'text-slate-600 cursor-default'}`}><ChevronLeft size={24} /></button>
+              <span className="font-bold text-slate-200">
+                {step === 1 ? '내 정보 설정' : '캐릭터 커스텀'}
+              </span>
+              <button onClick={() => setStep(step + 1)} disabled={step === 2} className={`p-1 rounded-full ${step < 3 ? 'bg-indigo-600 text-white hover:bg-indigo-500' : 'text-slate-600 cursor-default'}`}>
+                 {step < 2 ? <ArrowRight size={20} /> : <Check size={20} />}
+              </button>
+          </div>
+
           <div className="p-6 overflow-y-auto flex-1 space-y-8 scrollbar-hide">
+            
+            {/* 공통 헤더 */}
             <div className="space-y-4">
               <h1 className="text-2xl font-black text-slate-200 flex items-center gap-2">
                 <span className="bg-indigo-600 text-white p-2 rounded-xl"><Settings size={20}/></span> 나만의 비밀친구
@@ -495,28 +501,76 @@ const App = () => {
               )}
             </div>
 
-            {/* 내 정보 설정 */}
-            <div className="bg-slate-800 p-4 rounded-2xl border border-indigo-900 space-y-3">
-              <label className="text-xs font-bold text-slate-400 flex items-center gap-1"><User size={12}/> 내 정보 (AI가 참고해요)</label>
-              <div className="grid grid-cols-2 gap-2">
-                <input type="text" placeholder="내 이름(호칭)" className="p-2 bg-slate-700 rounded-lg text-xs text-white" value={userInfo.nickname} onChange={(e)=>setUserInfo({...userInfo, nickname: e.target.value})}/>
-                <input type="text" placeholder="MBTI" className="p-2 bg-slate-700 rounded-lg text-xs text-white" value={userInfo.mbti} onChange={(e)=>setUserInfo({...userInfo, mbti: e.target.value})}/>
-              </div>
-              <input type="text" placeholder="우리의 관계 (예: 소꿉친구)" className="w-full p-2 bg-slate-700 rounded-lg text-xs text-white" value={userInfo.relation} onChange={(e)=>setUserInfo({...userInfo, relation: e.target.value})}/>
-              
-              <div>
-                <label className="text-xs font-bold text-slate-400 mb-1 block">관심사/대화 주제</label>
-                <div className="flex flex-wrap gap-1">
-                  {["연애", "진로", "위로", "일상", "덕질", "고민"].map(t => (
-                    <button key={t} onClick={() => toggleTopic(t)} className={`text-[10px] px-2 py-1 rounded-full border ${userInfo.topics?.includes(t) ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-slate-700 text-slate-400 border-slate-600 hover:bg-slate-600'}`}>{t}</button>
-                  ))}
+            {/* Step 1: 내 정보 설정 */}
+            {(step === 1 || window.innerWidth > 768) && (
+                 <div className="bg-slate-800 p-4 rounded-2xl border border-indigo-900 space-y-3">
+                    <label className="text-xs font-bold text-slate-400 flex items-center gap-1"><User size={12}/> 내 정보</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input type="text" placeholder="내 이름(호칭)" className="p-2 bg-slate-700 rounded-lg text-xs text-white" value={userInfo.nickname} onChange={(e)=>setUserInfo({...userInfo, nickname: e.target.value})}/>
+                      <input type="text" placeholder="MBTI" className="p-2 bg-slate-700 rounded-lg text-xs text-white" value={userInfo.mbti} onChange={(e)=>setUserInfo({...userInfo, mbti: e.target.value})}/>
+                    </div>
+                    <input type="text" placeholder="우리의 관계 (예: 소꿉친구)" className="w-full p-2 bg-slate-700 rounded-lg text-xs text-white" value={userInfo.relation} onChange={(e)=>setUserInfo({...userInfo, relation: e.target.value})}/>
+                    
+                    <div>
+                      <label className="text-xs font-bold text-slate-400 mb-1 block">관심사/대화 주제</label>
+                      <div className="flex flex-wrap gap-1">
+                        {["연애", "진로", "위로", "일상", "덕질", "고민"].map(t => (
+                          <button key={t} onClick={() => toggleTopic(t)} className={`text-[10px] px-2 py-1 rounded-full border ${userInfo.topics?.includes(t) ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-slate-700 text-slate-400 border-slate-600 hover:bg-slate-600'}`}>{t}</button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+            )}
+            
+            {/* Step 2: 캐릭터 커스텀 */}
+            {(step === 2 || window.innerWidth > 768) && (
+              <div className="space-y-6">
+                
+                {/* 캐릭터 미리보기 */}
+                <div className="relative bg-slate-800 p-8 rounded-3xl shadow-inner border border-slate-700 flex justify-center items-center group overflow-hidden h-64">
+                    <div className="absolute inset-0 bg-slate-900 opacity-0 rounded-3xl"></div>
+                    <div className="w-full h-full max-w-56 max-h-56"><AlienSVG features={activeChar.features} emotion={currentEmotion} /></div>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-xs font-bold text-slate-400 flex items-center gap-1"><Palette size={14}/> 꾸미기</label>
+                  <div className="flex gap-3 justify-center mb-2">
+                    {colors.map((c) => (
+                      <button key={c.code} onClick={() => updateFeatures("color", c.code)} className={`w-6 h-6 rounded-full shadow-sm transition-all hover:scale-110 border-2 ${activeChar.features.color === c.code ? 'border-indigo-400' : 'border-slate-700'}`} style={{ backgroundColor: c.code }} />
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <select className="p-2 bg-slate-800 rounded-xl text-sm border border-slate-700 text-slate-200 outline-none" value={activeChar.features.antenna} onChange={(e) => updateFeatures("antenna", e.target.value)}><option value="cat">고양이 귀</option><option value="star">별 더듬이</option><option value="bear">곰돌이 귀</option></select>
+                    <select className="p-2 bg-slate-800 rounded-xl text-sm border border-slate-700 text-slate-200 outline-none" value={activeChar.features.eyes} onChange={(e) => updateFeatures("eyes", e.target.value)}>
+                      <option value="gem">💎 보석 눈</option><option value="sparkle">✨ 반짝 눈</option><option value="mischief">😈 장난 눈</option><option value="smile">😊 웃는 눈</option><option value="droopy">🥺 처진 눈</option><option value="sleepy">💤 졸린 눈</option><option value="dot">⚫ 점 눈</option><option value="chic">😒 까칠 눈</option>
+                    </select>
+                    <select className="p-2 bg-slate-800 rounded-xl text-sm border border-slate-700 text-slate-200 outline-none" value={activeChar.features.mouth} onChange={(e) => updateFeatures("mouth", e.target.value)}>
+                      <option value="cat">😽 고양이 입</option><option value="small_smile">🙂 미소</option><option value="big_smile">😄 활짝 입</option><option value="tongue">😛 메롱</option><option value="o">😮 오 입</option><option value="wavy">🥴 물결 입</option>
+                    </select>
+                    <select className="p-2 bg-slate-800 rounded-xl text-sm border border-slate-700 text-slate-200 outline-none" value={activeChar.features.accessory} onChange={(e) => updateFeatures("accessory", e.target.value)}><option value="suit">우주복</option><option value="pajama">잠옷</option><option value="scarf">스카프</option><option value="none">없음</option></select>
+                  </div>
+                </div>
+
+                <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700 space-y-4">
+                  <div className="grid grid-cols-2 gap-2">
+                    <input type="text" value={activeChar.name} onChange={(e)=>updateCharacter("name", e.target.value)} className="p-2 bg-slate-700 rounded-lg text-center font-bold text-white" placeholder="캐릭터 이름" />
+                    <select value={activeChar.speechStyle || 'casual'} onChange={(e)=>updateCharacter("speechStyle", e.target.value)} className="p-2 bg-slate-700 rounded-lg text-sm text-white outline-none">
+                      <option value="casual">반말 모드</option><option value="polite">존댓말 모드</option>
+                    </select>
+                  </div>
+                  <div className="space-y-4 pt-2">
+                    <div><div className="flex justify-between text-xs text-slate-400 mb-1"><span>조용함 (I)</span><span>활발함 (E)</span></div><input type="range" className="w-full accent-indigo-500 h-1.5 bg-slate-700 rounded-lg appearance-none" value={activeChar.personality.energy} onChange={(e)=>updatePersonality("energy", e.target.value)} /></div>
+                    <div><div className="flex justify-between text-xs text-slate-400 mb-1"><span>현실적 (S)</span><span>상상력 (N)</span></div><input type="range" className="w-full accent-purple-400 h-1.5 bg-slate-700 rounded-lg appearance-none" value={activeChar.personality.intuition} onChange={(e)=>updatePersonality("intuition", e.target.value)} /></div>
+                    <div><div className="flex justify-between text-xs text-slate-400 mb-1"><span>이성적 (T)</span><span>감성적 (F)</span></div><input type="range" className="w-full accent-pink-400 h-1.5 bg-slate-700 rounded-lg appearance-none" value={activeChar.personality.empathy} onChange={(e)=>updatePersonality("empathy", e.target.value)} /></div>
+                    <div><div className="flex justify-between text-xs text-slate-400 mb-1"><span>계획적 (J)</span><span>즉흥적 (P)</span></div><input type="range" className="w-full accent-orange-400 h-1.5 bg-slate-700 rounded-lg appearance-none" value={activeChar.personality.flexibility} onChange={(e)=>updatePersonality("flexibility", e.target.value)} /></div>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            {/* 캐릭터 목록 */}
-            <div>
-              <label className="text-xs font-bold text-slate-400 mb-2 block flex items-center justify-between">
+            )}
+            
+            {/* Step 3: 캐릭터 목록 */}
+            <div className="space-y-3">
+              <label className="text-xs font-bold text-slate-400 flex items-center justify-between">
                 <span className="flex items-center gap-1"><Smile size={12}/> 내 친구들</span>
                 <span className="text-[10px] text-slate-600">자동 저장됨</span>
               </label>
@@ -530,67 +584,32 @@ const App = () => {
                 <button onClick={addCharacter} className="shrink-0 w-16 h-16 rounded-2xl border-2 border-dashed border-slate-600 flex items-center justify-center text-slate-500 hover:border-indigo-400 hover:text-indigo-400 hover:bg-slate-800 transition"><Plus size={24}/></button>
               </div>
             </div>
-
-            {/* 🛸 뷰어 & 사운드 */}
-            <div className="relative bg-slate-800 p-8 rounded-3xl shadow-inner border border-slate-700 flex justify-center items-center group overflow-hidden h-64">
-              <div className="absolute inset-0 bg-slate-900 opacity-0 rounded-3xl"></div>
-              <div className="w-full h-full max-w-56 max-h-56"><AlienSVG features={activeChar.features} emotion={currentEmotion} /></div>
-              <div className="absolute bottom-4 right-4 flex gap-2">
-                <button onClick={() => { setBgmEnabled(!bgmEnabled); initAudio(); }} className={`p-2 rounded-full shadow-sm transition ${bgmEnabled ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`} title="BGM"><Music size={16}/></button>
-                <button onClick={() => { setSoundEnabled(!soundEnabled); initAudio(); }} className={`p-2 rounded-full shadow-sm transition ${soundEnabled ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`} title="효과음">{soundEnabled ? <Volume2 size={16}/> : <VolumeX size={16}/>}</button>
-              </div>
-            </div>
-
-            {/* 설정 탭 */}
-            <div className="space-y-6">
-              <div className="space-y-3">
-                <label className="text-xs font-bold text-slate-400 flex items-center gap-1"><Palette size={14}/> 꾸미기</label>
-                <div className="flex gap-3 justify-center mb-2">
-                  {colors.map((c) => (
-                    <button key={c.code} onClick={() => updateFeatures("color", c.code)} className={`w-6 h-6 rounded-full shadow-sm transition-all hover:scale-110 border-2 ${activeChar.features.color === c.code ? 'border-indigo-400' : 'border-slate-700'}`} style={{ backgroundColor: c.code }} />
-                  ))}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <select className="p-2 bg-slate-800 rounded-xl text-sm border border-slate-700 text-slate-200 outline-none" value={activeChar.features.antenna} onChange={(e) => updateFeatures("antenna", e.target.value)}><option value="cat">고양이 귀</option><option value="star">별 더듬이</option><option value="bear">곰돌이 귀</option></select>
-                  <select className="p-2 bg-slate-800 rounded-xl text-sm border border-slate-700 text-slate-200 outline-none" value={activeChar.features.eyes} onChange={(e) => updateFeatures("eyes", e.target.value)}>
-                    <option value="gem">💎 보석 눈</option><option value="sparkle">✨ 반짝 눈</option><option value="mischief">😈 장난 눈</option><option value="smile">😊 웃는 눈</option><option value="droopy">🥺 처진 눈</option><option value="sleepy">💤 졸린 눈</option><option value="dot">⚫ 점 눈</option><option value="chic">😒 까칠 눈</option>
-                  </select>
-                  <select className="p-2 bg-slate-800 rounded-xl text-sm border border-slate-700 text-slate-200 outline-none" value={activeChar.features.mouth} onChange={(e) => updateFeatures("mouth", e.target.value)}>
-                    <option value="cat">😽 고양이 입</option><option value="small_smile">🙂 미소</option><option value="big_smile">😄 활짝 입</option><option value="tongue">😛 메롱</option><option value="o">😮 오 입</option><option value="wavy">🥴 물결 입</option>
-                  </select>
-                  <select className="p-2 bg-slate-800 rounded-xl text-sm border border-slate-700 text-slate-200 outline-none" value={activeChar.features.accessory} onChange={(e) => updateFeatures("accessory", e.target.value)}><option value="suit">우주복</option><option value="pajama">잠옷</option><option value="scarf">스카프</option><option value="none">없음</option></select>
-                </div>
-              </div>
-
-              <div className="bg-slate-800 p-5 rounded-2xl border border-slate-700 space-y-4">
-                <div className="grid grid-cols-2 gap-2">
-                  <input type="text" value={activeChar.name} onChange={(e)=>updateCharacter("name", e.target.value)} className="p-2 bg-slate-700 rounded-lg text-center font-bold text-white" placeholder="캐릭터 이름" />
-                  <select value={activeChar.speechStyle || 'casual'} onChange={(e)=>updateCharacter("speechStyle", e.target.value)} className="p-2 bg-slate-700 rounded-lg text-sm text-white outline-none">
-                    <option value="casual">반말 모드</option><option value="polite">존댓말 모드</option>
-                  </select>
-                </div>
-                <div className="space-y-4 pt-2">
-                  <div><div className="flex justify-between text-xs text-slate-400 mb-1"><span>조용함 (I)</span><span>활발함 (E)</span></div><input type="range" className="w-full accent-indigo-500 h-1.5 bg-slate-700 rounded-lg appearance-none" value={activeChar.personality.energy} onChange={(e)=>updatePersonality("energy", e.target.value)} /></div>
-                  <div><div className="flex justify-between text-xs text-slate-400 mb-1"><span>현실적 (S)</span><span>상상력 (N)</span></div><input type="range" className="w-full accent-purple-400 h-1.5 bg-slate-700 rounded-lg appearance-none" value={activeChar.personality.intuition} onChange={(e)=>updatePersonality("intuition", e.target.value)} /></div>
-                  <div><div className="flex justify-between text-xs text-slate-400 mb-1"><span>이성적 (T)</span><span>감성적 (F)</span></div><input type="range" className="w-full accent-pink-400 h-1.5 bg-slate-700 rounded-lg appearance-none" value={activeChar.personality.empathy} onChange={(e)=>updatePersonality("empathy", e.target.value)} /></div>
-                  <div><div className="flex justify-between text-xs text-slate-400 mb-1"><span>계획적 (J)</span><span>즉흥적 (P)</span></div><input type="range" className="w-full accent-orange-400 h-1.5 bg-slate-700 rounded-lg appearance-none" value={activeChar.personality.flexibility} onChange={(e)=>updatePersonality("flexibility", e.target.value)} /></div>
-                </div>
-              </div>
-            </div>
+            
           </div>
+          
+          {/* 모바일 하단 Step 버튼 (데스크탑에서는 숨김) */}
           <div className="p-4 bg-slate-800 border-t border-slate-700 md:hidden">
-            <button onClick={() => setStep(2)} className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-lg flex items-center justify-center gap-2">대화하기 <MessageCircle size={18}/></button>
+            {step === 1 && <button onClick={() => setStep(2)} className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-lg flex items-center justify-center gap-2">캐릭터 커스텀하기 <ArrowRight size={18}/></button>}
+            {step === 2 && <button onClick={() => setStep(3)} className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-lg flex items-center justify-center gap-2">대화 시작하기 <MessageCircle size={18}/></button>}
           </div>
+
         </div>
 
-        {/* [오른쪽] 채팅 패널 */}
-        <div className={`w-full md:w-2/3 bg-slate-900 flex flex-col ${step === 2 ? 'flex' : 'hidden md:flex'}`}>
-          <div className="md:hidden p-4 bg-slate-800 border-b border-slate-700 flex items-center justify-between sticky top-0 z-10">
-            <button onClick={() => setStep(1)} className="p-2 bg-slate-700 rounded-full hover:bg-slate-600 text-slate-200"><Settings size={18}/></button>
+        {/* [오른쪽] 채팅 패널 - 모바일 Step 3 화면 */}
+        <div className={`w-full md:w-2/3 bg-slate-900 flex flex-col ${step === 3 || window.innerWidth > 768 ? 'flex' : 'hidden md:flex'}`}>
+          
+          {/* 채팅 헤더 */}
+          <div className="p-4 bg-slate-800 border-b border-slate-700 flex items-center justify-between sticky top-0 z-10">
+            {window.innerWidth <= 768 && <button onClick={() => setStep(1)} className="p-2 bg-slate-700 rounded-full hover:bg-slate-600 text-slate-200"><ChevronLeft size={20}/></button>}
             <span className="font-bold text-slate-200">{activeChar.name}</span>
-            <div className="w-8"></div>
+            <div className="absolute top-0 right-4 flex gap-2 pt-4">
+               <button onClick={() => { setBgmEnabled(!bgmEnabled); initAudio(); }} className={`p-2 rounded-full shadow-sm transition ${bgmEnabled ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`} title="BGM"><Music size={16}/></button>
+               <button onClick={() => { setSoundEnabled(!soundEnabled); initAudio(); }} className={`p-2 rounded-full shadow-sm transition ${soundEnabled ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`} title="효과음">{soundEnabled ? <Volume2 size={16}/> : <VolumeX size={16}/>}</button>
+            </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          
+          {/* 메시지 영역 - 모바일 스크롤 해결 핵심 */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-6"> 
             {messages.map((msg, idx) => (
               <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start items-end gap-2'}`}>
                 {msg.role !== 'user' && (
@@ -598,7 +617,7 @@ const App = () => {
                     <div className="w-8 h-8"><AlienSVG features={activeChar.features} emotion="normal" size="small"/></div>
                   </div>
                 )}
-                <div className={`max-w-[75%] p-4 rounded-3xl text-[15px] leading-relaxed shadow-sm whitespace-pre-wrap ${msg.role === 'user' ? 'bg-indigo-500 text-white rounded-br-md' : 'bg-slate-700 text-slate-200 border border-slate-600 rounded-bl-md'}`}>{typeof msg.text === 'string' ? msg.text : '...' }</div>
+                <div className={`max-w-[85%] p-4 rounded-3xl text-[15px] leading-relaxed shadow-sm whitespace-pre-wrap ${msg.role === 'user' ? 'bg-indigo-500 text-white rounded-br-md' : 'bg-slate-700 text-slate-200 border border-slate-600 rounded-bl-md'}`}>{typeof msg.text === 'string' ? msg.text : '...' }</div>
               </div>
             ))}
             {loading && <div className="ml-12 text-xs text-slate-400 flex items-center gap-2"><span>💬</span> 생각하는 중...</div>}
@@ -614,15 +633,17 @@ const App = () => {
             )}
             <div ref={messagesEndRef} />
           </div>
-          <div className="p-5 bg-slate-800 border-t border-slate-700">
+          
+          {/* 입력창 (하단 고정) */}
+          <div className="p-5 bg-slate-800 border-t border-slate-700 flex-shrink-0">
             <div className="flex justify-end mb-3">
-               <button onClick={handleSuggest} disabled={suggestLoading || messages.length < 2 || !apiKey} className="text-xs flex items-center gap-1.5 text-slate-400 hover:text-indigo-400 transition bg-slate-900 px-3 py-1.5 rounded-full">
+               <button onClick={handleSuggest} disabled={suggestLoading || messages.length < 2 || !apiKey} className="text-xs flex items-center gap-1.5 text-slate-400 hover:text-indigo-400 transition bg-slate-900 px-3 py-1.5 rounded-full" title={!apiKey ? "API 키를 입력해주세요" : "대화 흐름에 맞는 추천 답변을 AI가 생성합니다"}>
                  {suggestLoading ? <span className="animate-spin">⏳</span> : <Lightbulb size={14} />} {suggestLoading ? "고민 중..." : "할 말이 없을 땐?"}
                </button>
             </div>
             <div className="flex gap-2 items-center bg-slate-900 p-2 rounded-[20px] focus-within:ring-2 focus-within:ring-indigo-700 focus-within:bg-slate-800 transition-all border border-transparent focus-within:border-indigo-800">
               <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()} placeholder={`${activeChar.name}에게 말 걸기...`} className="flex-1 bg-transparent px-4 py-3 outline-none text-sm placeholder:text-slate-500 text-slate-200" disabled={!apiKey} />
-              <button onClick={() => handleSend()} disabled={loading || !input.trim() || !apiKey} className={`p-3 rounded-2xl transition-all shadow-md ${input.trim() ? 'bg-indigo-500 text-white hover:scale-105 hover:bg-indigo-400' : 'bg-slate-700 text-slate-500'}`}><Send size={20} /></button>
+              <button onClick={() => handleSend()} disabled={loading || !input.trim() || !apiKey} className={`p-3 rounded-2xl transition-all shadow-md ${input.trim() && apiKey ? 'bg-indigo-500 text-white hover:scale-105 hover:bg-indigo-400' : 'bg-slate-700 text-slate-500 cursor-not-allowed'}`}><Send size={20} /></button>
             </div>
           </div>
         </div>
