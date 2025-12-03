@@ -292,13 +292,15 @@ const AlienSVG = ({ features, emotion, size = "large" }) => {
 const App = () => {
   const [step, setStep] = useState(1);
   
-  // [수정] API 키 초기화 로직: process.env 대신 window.VITE_ 로 fallback 처리
+  // [수정] API 키 초기화 로직: 환경 변수 > localStorage 순으로 불러옵니다.
   const [apiKey, setApiKey] = useState(() => {
     if (typeof window !== 'undefined') {
-      // Vercel 환경에서 안전하게 VITE_GEMINI_API_KEY를 읽습니다.
-      const vercelEnvKey = window.VITE_GEMINI_API_KEY || (typeof process !== 'undefined' ? process.env.VITE_GEMINI_API_KEY : undefined);
+      const isDevEnv = typeof process !== 'undefined' && process.env.NODE_ENV !== 'production';
+      // Vercel 환경 변수가 설정되었다면 바로 사용합니다.
+      const vercelEnvKey = isDevEnv ? (typeof process.env.VITE_GEMINI_API_KEY !== 'undefined' ? process.env.VITE_GEMINI_API_KEY : '') : '';
+      
       if (vercelEnvKey) return vercelEnvKey;
-      // Vercel 환경이 아니면 localStorage 사용
+      
       return localStorage.getItem("gemini_api_key") || "";
     }
     return "";
@@ -343,12 +345,17 @@ const App = () => {
   
   // API 키 저장 로직: Vercel 환경 변수가 로드되지 않은 경우에만 localStorage에 저장
   useEffect(() => { 
-    const isVercelEnvLoaded = (typeof window.VITE_GEMINI_API_KEY !== 'undefined' && window.VITE_GEMINI_API_KEY);
-    if (apiKey && !isVercelEnvLoaded) {
+    // Vercel 환경 체크 (process.env.VERCEL_ENV 대신 API 키 유무로 체크)
+    if (apiKey && !isVercelEnvCheck()) {
       localStorage.setItem("gemini_api_key", apiKey);
     }
   }, [apiKey]);
   
+  const isVercelEnvCheck = () => {
+    // Vercel 환경 변수가 설정되어 있으면 true 반환 (Vite가 환경 변수를 주입하는 방식에 의존)
+    return (typeof process !== 'undefined' && process.env.VITE_GEMINI_API_KEY);
+  }
+
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
   useEffect(() => { setCurrentEmotion('normal'); }, [activeCharId]);
 
@@ -526,7 +533,7 @@ const App = () => {
 
             {/* 🛸 뷰어 & 사운드 */}
             <div className="relative bg-slate-800 p-8 rounded-3xl shadow-inner border border-slate-700 flex justify-center items-center group overflow-hidden h-64">
-              <div className="absolute inset-0 bg-slate-900 opacity={0} rounded-3xl"></div>
+              <div className="absolute inset-0 bg-slate-900 opacity-0 rounded-3xl"></div>
               <div className="w-full h-full max-w-56 max-h-56"><AlienSVG features={activeChar.features} emotion={currentEmotion} /></div>
               <div className="absolute bottom-4 right-4 flex gap-2">
                 <button onClick={() => { setBgmEnabled(!bgmEnabled); initAudio(); }} className={`p-2 rounded-full shadow-sm transition ${bgmEnabled ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-400 hover:bg-slate-600'}`} title="BGM"><Music size={16}/></button>
