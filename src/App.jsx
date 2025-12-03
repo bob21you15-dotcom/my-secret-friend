@@ -295,6 +295,7 @@ const App = () => {
   // API 키 초기화 로직: 환경 변수 > localStorage 순으로 불러옵니다.
   const [apiKey, setApiKey] = useState(() => {
     if (typeof window !== 'undefined') {
+      // Vercel 환경 변수가 설정되었다면 바로 사용합니다. (Node.js 환경 변수를 사용하도록 변경)
       const vercelEnvKey = (typeof process !== 'undefined' && process.env.VITE_GEMINI_API_KEY) || (typeof window.VITE_GEMINI_API_KEY !== 'undefined' ? window.VITE_GEMINI_API_KEY : undefined);
       if (vercelEnvKey) return vercelEnvKey;
       
@@ -342,7 +343,10 @@ const App = () => {
   
   // API 키 저장 로직: Vercel 환경 변수가 로드되지 않은 경우에만 localStorage에 저장
   useEffect(() => { 
+    // Vercel 환경 변수 체크 (Vercel에 배포된 경우 process.env.VERCEL_ENV가 'production' 등 특정 값으로 설정됨)
     const isVercelEnvLoaded = (typeof process !== 'undefined' && process.env.VITE_GEMINI_API_KEY) || (typeof window.VITE_GEMINI_API_KEY !== 'undefined' && window.VITE_GEMINI_API_KEY);
+    
+    // 환경 변수가 설정되어 있으면 localStorage에 저장하지 않음 (보안)
     if (apiKey && !isVercelEnvLoaded) {
       localStorage.setItem("gemini_api_key", apiKey);
     }
@@ -378,7 +382,7 @@ const App = () => {
   const addCharacter = () => {
     const newId = Date.now();
     const newChar = {
-      id: newId, name: "새 친구", tone: "존댓말", speechStyle: 'polite', interests: ["독서"],
+      id: newId, name: "새 친구", tone: "반말 (~어)", speechStyle: 'polite', interests: ["독서"],
       personality: { energy: 30, empathy: 60, intuition: 50, flexibility: 20 },
       features: { color: "#A0E7E5", colorName: "민트", shadowColor: "#167A8A", antenna: "cat", eyes: "gem", mouth: "cat", accessory: "none" },
       history: [{ role: 'system', text: `반갑습니다. 저는 새로운 친구예요. [nod]` }]
@@ -531,6 +535,12 @@ const App = () => {
                     <div className="absolute inset-0 bg-slate-900 opacity-0 rounded-3xl"></div>
                     <div className="w-full h-full max-w-56 max-h-56"><AlienSVG features={activeChar.features} emotion={currentEmotion} /></div>
                 </div>
+                
+                {/* [NEW] 캐릭터 아래 '대화 시작하기' 버튼 */}
+                <div className="flex justify-center">
+                   <button onClick={() => setStep(3)} disabled={!apiKey} className={`w-1/2 py-3 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 ${apiKey ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-slate-600 text-slate-400 cursor-not-allowed'}`} title={!apiKey ? "API 키를 입력해야 대화를 시작할 수 있습니다." : ""}>대화 시작하기 <MessageCircle size={18}/></button>
+                </div>
+
 
                 <div className="space-y-3">
                   <label className="text-xs font-bold text-slate-400 flex items-center gap-1"><Palette size={14}/> 꾸미기</label>
@@ -590,7 +600,7 @@ const App = () => {
           {/* 모바일 하단 Step 버튼 (데스크탑에서는 숨김) */}
           <div className="p-4 bg-slate-800 border-t border-slate-700 md:hidden">
             {step === 1 && <button onClick={() => setStep(2)} className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-lg flex items-center justify-center gap-2">캐릭터 커스텀하기 <ArrowRight size={18}/></button>}
-            {step === 2 && <button onClick={() => setStep(3)} className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold shadow-lg flex items-center justify-center gap-2">대화 시작하기 <MessageCircle size={18}/></button>}
+            {step === 2 && <button onClick={() => setStep(3)} disabled={!apiKey} className={`w-full py-4 rounded-2xl font-bold shadow-lg flex items-center justify-center gap-2 ${apiKey ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-slate-600 text-slate-400 cursor-not-allowed'}`} title={!apiKey ? "API 키를 입력해야 대화를 시작할 수 있습니다." : ""}>대화 시작하기 <MessageCircle size={18}/></button>}
           </div>
 
         </div>
