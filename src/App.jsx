@@ -272,7 +272,7 @@ const AlienSVG = ({ features, emotion, size = "large" }) => {
   );
 
   return (
-    <svg viewBox="0 0 220 230" className={`w-full h-full drop-shadow-xl transition-all duration-500 ${animationClass}`}>
+    <svg viewBox="0 0 220 230" className={`w-full h-full drop-shadow-xl transition-all duration-500 ${animationClass}`} xmlns="http://www.w3.org/2000/svg">
       <Defs />
       {renderLimbs()}
       {renderEars()}
@@ -291,10 +291,18 @@ const AlienSVG = ({ features, emotion, size = "large" }) => {
 /* --- 4. 메인 컴포넌트 --- */
 const App = () => {
   const [step, setStep] = useState(1);
+  
+  // API 키 초기화 로직 수정: 환경 변수 > localStorage 순으로 불러옵니다.
   const [apiKey, setApiKey] = useState(() => {
-    if (typeof window !== 'undefined') return localStorage.getItem("gemini_api_key") || "";
+    if (typeof window !== 'undefined') {
+      const isDevEnv = typeof process !== 'undefined' && process.env.NODE_ENV !== 'production';
+      const envKey = isDevEnv ? (typeof process.env.VITE_GEMINI_API_KEY !== 'undefined' ? process.env.VITE_GEMINI_API_KEY : '') : ''; // 로컬 개발 환경에서만 process.env 사용
+      if (envKey) return envKey;
+      return localStorage.getItem("gemini_api_key") || "";
+    }
     return "";
   });
+  
   const [loading, setLoading] = useState(false);
   const [suggestLoading, setSuggestLoading] = useState(false); 
   const [currentEmotion, setCurrentEmotion] = useState('normal'); 
@@ -331,7 +339,20 @@ const App = () => {
 
   useEffect(() => { localStorage.setItem("mySecretFriends", JSON.stringify(characters)); }, [characters]);
   useEffect(() => { localStorage.setItem("myUserInfo", JSON.stringify(userInfo)); }, [userInfo]);
-  useEffect(() => { if (apiKey) localStorage.setItem("gemini_api_key", apiKey); }, [apiKey]);
+  
+  // API 키 저장 로직: Vercel 환경에서는 localStorage에 저장하지 않음
+  useEffect(() => { 
+    if (apiKey && !isVercelProduction()) {
+      localStorage.setItem("gemini_api_key", apiKey);
+    }
+  }, [apiKey]);
+  
+  // [NEW] 환경 감지 함수
+  const isVercelProduction = () => {
+      // Vercel이 설정한 환경 변수를 체크하여 Vercel에서 실행 중인지 확인
+      return (typeof process !== 'undefined' && process.env.VERCEL_ENV === 'production');
+  }
+
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
   useEffect(() => { setCurrentEmotion('normal'); }, [activeCharId]);
 
@@ -387,7 +408,7 @@ const App = () => {
   const handleSend = async (textOverride = null) => {
     const textToSend = textOverride || input;
     if (!textToSend.trim()) return;
-    if (!apiKey) { alert("API 키가 필요해요!"); return; }
+    if (!apiKey) { alert("API 키가 필요해요! 설정을 확인해주세요."); return; }
     
     if(soundEnabled) playSound('pop');
     const userMsg = { role: 'user', text: textToSend };
@@ -413,7 +434,7 @@ const App = () => {
   };
 
   const handleSuggest = async () => {
-    if (!apiKey) return alert("API 키 입력 필수!");
+    if (!apiKey) return alert("API 키 입력 필수! 설정을 확인해주세요.");
     setSuggestLoading(true);
     try {
       const history = messages.map(m => `${m.role}: ${typeof m.text === 'string' ? m.text : ''}`).join('\n');
@@ -456,7 +477,19 @@ const App = () => {
               <h1 className="text-2xl font-black text-slate-200 flex items-center gap-2">
                 <span className="bg-indigo-600 text-white p-2 rounded-xl"><Settings size={20}/></span> 나만의 비밀친구
               </h1>
-              {!apiKey && <input type="password" placeholder="🔑 Gemini API Key" className="w-full p-3 bg-slate-700 border-2 border-indigo-500 text-slate-200 rounded-xl text-sm text-center outline-none focus:ring-2 focus:ring-indigo-400 transition shadow-sm placeholder-slate-400" onChange={(e) => setApiKey(e.target.value)} />}
+              {/* API 키가 없는 경우에만 입력 필드를 보여줍니다. */}
+              {!apiKey && (
+                 <input type="password" 
+                        placeholder="🔑 Gemini API Key (로컬 테스트용)" 
+                        className="w-full p-3 bg-slate-700 border-2 border-indigo-500 text-slate-200 rounded-xl text-sm text-center outline-none focus:ring-2 focus:ring-indigo-400 transition shadow-sm placeholder-slate-400" 
+                        onChange={(e) => setApiKey(e.target.value)} 
+                 />
+              )}
+              {apiKey && (
+                  <div className="p-3 bg-indigo-900/50 border border-indigo-700 rounded-xl text-xs text-center text-indigo-300">
+                      API 키가 안전하게 로드되었습니다.
+                  </div>
+              )}
             </div>
 
             {/* 내 정보 설정 */}
@@ -580,13 +613,13 @@ const App = () => {
           </div>
           <div className="p-5 bg-slate-800 border-t border-slate-700">
             <div className="flex justify-end mb-3">
-               <button onClick={handleSuggest} disabled={suggestLoading || messages.length < 2} className="text-xs flex items-center gap-1.5 text-slate-400 hover:text-indigo-400 transition bg-slate-900 px-3 py-1.5 rounded-full">
+               <button onClick={handleSuggest} disabled={suggestLoading || messages.length < 2 || !apiKey} className="text-xs flex items-center gap-1.5 text-slate-400 hover:text-indigo-400 transition bg-slate-900 px-3 py-1.5 rounded-full">
                  {suggestLoading ? <span className="animate-spin">⏳</span> : <Lightbulb size={14} />} {suggestLoading ? "고민 중..." : "할 말이 없을 땐?"}
                </button>
             </div>
             <div className="flex gap-2 items-center bg-slate-900 p-2 rounded-[20px] focus-within:ring-2 focus-within:ring-indigo-700 focus-within:bg-slate-800 transition-all border border-transparent focus-within:border-indigo-800">
               <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()} placeholder={`${activeChar.name}에게 말 걸기...`} className="flex-1 bg-transparent px-4 py-3 outline-none text-sm placeholder:text-slate-500 text-slate-200" />
-              <button onClick={() => handleSend()} disabled={loading || !input.trim()} className={`p-3 rounded-2xl transition-all shadow-md ${input.trim() ? 'bg-indigo-500 text-white hover:scale-105 hover:bg-indigo-400' : 'bg-slate-700 text-slate-500'}`}><Send size={20} /></button>
+              <button onClick={() => handleSend()} disabled={loading || !input.trim() || !apiKey} className={`p-3 rounded-2xl transition-all shadow-md ${input.trim() ? 'bg-indigo-500 text-white hover:scale-105 hover:bg-indigo-400' : 'bg-slate-700 text-slate-500'}`}><Send size={20} /></button>
             </div>
           </div>
         </div>
